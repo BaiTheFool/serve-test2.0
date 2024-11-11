@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>局域网聊天</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f2f2f2;
+            padding-top: 20px;
+        }
+        .chat-container {
+            width: 60%;
+            max-width: 600px;
+            margin: 20px auto;
+        }
+        #messages {
+            border: 1px solid #ddd;
+            height: 300px;
+            overflow-y: scroll;
+            padding: 10px;
+            background-color: #fff;
+            margin-bottom: 10px;
+        }
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+        input, button {
+            padding: 8px;
+            font-size: 16px;
+        }
+        button {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>局域网聊天</h1>
+    <div class="chat-container">
+        <div>
+            <label>用户名: </label>
+            <input type="text" id="username" placeholder="输入用户名" required>
+        </div>
+        <div>
+            <button onclick="createRoom()">创建房间</button>
+            <input type="text" id="roomIP" placeholder="输入房间 IP 地址">
+            <button onclick="joinRoom()">加入房间</button>
+        </div>
+        <div id="messages"></div>
+        <div class="input-area">
+            <input type="text" id="messageInput" placeholder="输入消息">
+            <button onclick="sendMessage()">发送</button>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        let username = '';
+
+        function createRoom() {
+            const localIP = 'ws://localhost:8080';  // 本地 WebSocket 服务的地址
+            connectToRoom(localIP);
+        }
+
+        function joinRoom() {
+            const roomIP = document.getElementById('roomIP').value;
+            if (!roomIP) {
+                alert("请输入房间 IP 地址");
+                return;
+            }
+            connectToRoom(`ws://${roomIP}`);
+        }
+
+        function connectToRoom(serverURL) {
+            username = document.getElementById('username').value;
+            if (!username) {
+                alert("请输入用户名");
+                return;
+            }
+            socket = new WebSocket(serverURL);
+
+            socket.onopen = function () {
+                appendMessage(`已连接到房间`);
+                socket.send(JSON.stringify({ type: 'join', username: username }));
+            };
+
+            socket.onmessage = function (event) {
+                const data = JSON.parse(event.data);
+                if (data.type === 'message') {
+                    appendMessage(`${data.username}: ${data.message}`);
+                } else if (data.type === 'join') {
+                    appendMessage(`${data.username} 已加入房间`);
+                } else if (data.type === 'leave') {
+                    appendMessage(`${data.username} 已离开房间`);
+                }
+            };
+
+            socket.onclose = function () {
+                appendMessage("已断开连接");
+            };
+
+            socket.onerror = function () {
+                appendMessage("连接出错");
+            };
+        }
+
+        function sendMessage() {
+            const message = document.getElementById('messageInput').value;
+            if (message && socket) {
+                socket.send(JSON.stringify({ type: 'message', username: username, message: message }));
+                document.getElementById('messageInput').value = '';
+            }
+        }
+
+        function appendMessage(message) {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML += `<p>${message}</p>`;
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // 监听 Enter 键发送消息
+        document.getElementById('messageInput').addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
